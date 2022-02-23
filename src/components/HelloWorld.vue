@@ -5,7 +5,7 @@
         <el-button type="primary" class="save" @click='on_click_save'>备份存档</el-button>
       </div>
       <div class="right">
-        <el-button type="primary" class="restore">还原存档</el-button>
+        <el-button type="primary" class="restore" @click='on_click_restore'>还原存档</el-button>
       </div>
     </div>
 
@@ -41,7 +41,8 @@
 
 <script>
 window.electron = require('electron');
-const fs = require('electron');
+const fs = require('fs');
+const path = require('path');
 export default {
   name: "HelloWorld",
   methods: {
@@ -69,16 +70,53 @@ export default {
         // 让玩家指定游戏目录
       }
 
-      console.log('fs = ', fs);
+      return fs.existsSync(this.homeEnv);
+    },
+
+    createSavesFile() {
+      const savesPath = path.join(__dirname, "saves");
+      if(fs.existsSync(savesPath)) {
+        fs.mkdirSync(savesPath)
+      }
     },
 
     on_click_save() {
-      console.log('home = ', this.homeEnv);
+      // if(this.checkGameFileExists()) {
+      //   return ;
+      // }
+      // require('@electron/remote/main').initialize();
+      // console.log('electron = ', window.electron);
+      this.onOpenFilePositionButtonClick();
+    },
+
+
+    onOpenFilePositionButtonClick() {
+      window.electron.remote.dialog.showOpenDialog({
+          title: "请选择游戏路径",
+          filters: [
+              { name: 'Custom File Type', extensions: ['js', 'html', 'json'] },
+            ],
+          properties : ['openDirectory']
+      }).then(result => {
+          console.log(result.canceled)
+          console.log(result.filePaths)
+      }).catch(err => {
+        console.log(err)
+      });
+    },
+
+    on_click_restore() {
+      if(this.checkGameFileExists()) {
+        return ;
+      }
+
+
     }
   },
 
   created() {
     this.getHomeDirEnv();
+    this.createSavesFile();
     this.checkGameFileExists();
   },
 
