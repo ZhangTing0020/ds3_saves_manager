@@ -2,10 +2,10 @@
   <div class="hello">
     <div class="top">
       <div class="left">
-        <el-button type="primary" plain class="save">主要按钮</el-button>
+        <el-button type="primary" class="save" @click='on_click_save'>备份存档</el-button>
       </div>
       <div class="right">
-        <el-button type="primary" plain class="restore">主要按钮</el-button>
+        <el-button type="primary" class="restore">还原存档</el-button>
       </div>
     </div>
 
@@ -40,13 +40,48 @@
 </template>
 
 <script>
+window.electron = require('electron');
+const fs = require('electron');
 export default {
   name: "HelloWorld",
   methods: {
+
     deleteRow(index, rows) {
       rows.splice(index, 1);
     },
+
+    getHomeDirEnv() {
+      const cmd = require('node-cmd');
+      const path = require('path');
+      let homeEnv = cmd.runSync('echo %APPDATA%');
+      if(homeEnv.err) {
+        // TODO
+        // dialog warning when got home_env failed
+        // 让玩家指定游戏目录
+      }
+      this.homeEnv = path.join(homeEnv.data.replace(/\n/g, ""), 'DarkSoulsIII');
+    },
+
+    checkGameFileExists() {
+      if("" === this.homeEnv) {
+        // TODO
+        // dialog warning when got home_env failed
+        // 让玩家指定游戏目录
+      }
+
+      console.log('fs = ', fs);
+    },
+
+    on_click_save() {
+      console.log('home = ', this.homeEnv);
+    }
   },
+
+  created() {
+    this.getHomeDirEnv();
+    this.checkGameFileExists();
+  },
+
   data() {
     return {
       tableData: [
@@ -122,61 +157,8 @@ export default {
           steam_id: "bhfjdasu3",
           location: "D/abc",
         },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
       ],
+      homeEnv: "",
     };
   },
 };
