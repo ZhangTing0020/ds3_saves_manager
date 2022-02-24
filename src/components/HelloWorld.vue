@@ -51,48 +51,75 @@ export default {
       rows.splice(index, 1);
     },
 
-    getHomeDirEnv() {
+    getGameSaveDirEnv() {
       const cmd = require('node-cmd');
       const path = require('path');
-      let homeEnv = cmd.runSync('echo %APPDATA%');
-      if(homeEnv.err) {
+      let localSaveFilePath = cmd.runSync('echo %APPDATA%');
+      if(localSaveFilePath.err) {
         // TODO
         // dialog warning when got home_env failed
         // 让玩家指定游戏目录
+        this.localSaveFilePath = this.onOpenFilePositionButtonClick('黑暗之魂3存档');
+        return ;
       }
-      this.homeEnv = path.join(homeEnv.data.replace(/\n/g, ""), 'DarkSoulsIII');
+      this.localSaveFilePath = path.join(localSaveFilePath.data.replace(/\n/g, ""), 'DarkSoulsIII');
     },
 
-    checkGameFileExists() {
-      if("" === this.homeEnv) {
+    checkGameFileExists(title, filePath) {
+      if("" === filePath) {
         // TODO
         // dialog warning when got home_env failed
         // 让玩家指定游戏目录
+        filePath = this.onOpenFilePositionButtonClick(title);
+        if("" === filePath) {
+          return false;
+        }
       }
 
-      return fs.existsSync(this.homeEnv);
+      return fs.existsSync(filePath);
     },
 
     createSavesFile() {
-      const savesPath = path.join(__dirname, "saves");
-      if(fs.existsSync(savesPath)) {
+      const savesPath = path.join(process.cwd(), "saves");
+      if(!fs.existsSync(savesPath)) {
         fs.mkdirSync(savesPath)
       }
+      this.savesMgrDirPath = savesPath;
     },
 
     on_click_save() {
-      // if(this.checkGameFileExists()) {
+      // if(!this.checkGameFileExists('黑暗之魂3存档', this.localSaveFilePath)) {
       //   return ;
       // }
-      // require('@electron/remote/main').initialize();
-      // console.log('electron = ', window.electron);
-      this.onOpenFilePositionButtonClick();
+      if(!this.checkGameFileExists('导出存档', this.savesMgrDirPath)) {
+        this.createSavesFile();
+        if(!this.checkGameFileExists('导出存档', this.savesMgrDirPath)) {
+          return ;
+        }
+      }
+      
+      //TODO 
+      // 从输入框中收集存档信息，比如存档名
+      const savesPath = path.join(this.savesMgrDirPath, "111");
+      if(!this.checkVaildExportSavesDir(savesPath)) {
+        // TODO 
+        // 警告：该存档已存在，请重新取名
+        window.electron.remote.dialog.showMessageBoxSync({
+            message : `存档名存在，请重新取名`,
+            type : "info",
+            buttons : ['确认']
+        })
+        return ;
+      }
+
+
     },
 
 
-    onOpenFilePositionButtonClick() {
+    onOpenFilePositionButtonClick(title) {
+      let filePath = "";
       window.electron.remote.dialog.showOpenDialog({
-          title: "请选择游戏路径",
+          title: `请选择${title}路径`,
           filters: [
               { name: 'Custom File Type', extensions: ['js', 'html', 'json'] },
             ],
@@ -100,9 +127,14 @@ export default {
       }).then(result => {
           console.log(result.canceled)
           console.log(result.filePaths)
+          if(!result.canceled) {
+            filePath = result.filePaths[0];
+          }
       }).catch(err => {
         console.log(err)
       });
+
+      return filePath;
     },
 
     on_click_restore() {
@@ -111,13 +143,21 @@ export default {
       }
 
 
-    }
+    },
+    checkVaildExportSavesDir(dirName) {
+      if(fs.existsSync(dirName)) {
+        return false;
+      }
+
+      fs.mkdirSync(dirName);
+      return true;
+    },
   },
 
+
   created() {
-    this.getHomeDirEnv();
+    this.getGameSaveDirEnv();
     this.createSavesFile();
-    this.checkGameFileExists();
   },
 
   data() {
@@ -196,7 +236,8 @@ export default {
           location: "D/abc",
         },
       ],
-      homeEnv: "",
+      localSaveFilePath: "",
+      savesMgrDirPath: "",
     };
   },
 };
