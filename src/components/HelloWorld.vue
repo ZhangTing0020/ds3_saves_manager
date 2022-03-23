@@ -36,6 +36,38 @@
         </el-table-column>
       </el-table>
     </div>
+    <el-dialog
+      title="备份存档"
+      :visible.sync="isShowSaveCard"
+      width="60%"
+    >
+      <el-card>
+        <el-form ref="card0" :model="form" :rules="rules" label-width="80px">
+            <el-form-item prop="saveNameRule" label="存档名">
+              <el-input v-model="form.saveName"></el-input>
+            </el-form-item>
+            <el-form-item label="存档位置">
+              <el-input v-model="form.localSaveFilePath" :disabled="true" style="width: 100%;"></el-input>
+            </el-form-item>
+            <el-form-item label="备份位置">
+              <el-row :gutter="10">
+                <el-col :span="20">
+                  <el-input v-model="form.savesMgrDirPath" :disabled="true" style="width: 100%;"></el-input>
+                </el-col>
+                <el-col :span="2">
+                  <el-button @click="changeSaveDir()">更改</el-button>
+                </el-col>
+              </el-row>
+            </el-form-item>
+        </el-form>
+      </el-card>
+      <el-button
+        @click="onSaveInfo()"
+        class="submitButton"
+        type="primary"
+        >备份</el-button
+      >
+    </el-dialog>
   </div>
 </template>
 
@@ -43,6 +75,7 @@
 window.electron = require('electron');
 const fs = require('fs');
 const path = require('path');
+const moment = require('moment');
 export default {
   name: "HelloWorld",
   methods: {
@@ -53,66 +86,58 @@ export default {
 
     getGameSaveDirEnv() {
       const cmd = require('node-cmd');
-      const path = require('path');
-      let localSaveFilePath = cmd.runSync('echo %APPDATA%');
-      if(localSaveFilePath.err) {
-        // TODO
-        // dialog warning when got home_env failed
+      let cmdRes = cmd.runSync('echo %APPDATA%');
+      let localSaveFilePath0 = cmdRes.data;
+      if(cmdRes.err) {
         // 让玩家指定游戏目录
-        this.localSaveFilePath = this.onOpenFilePositionButtonClick('黑暗之魂3存档');
+        localSaveFilePath0 = this.onOpenFilePositionButtonClick('黑暗之魂3存档');
+      }
+      if("" === cmdRes.data) {
         return ;
       }
-      this.localSaveFilePath = path.join(localSaveFilePath.data.replace(/\n/g, ""), 'DarkSoulsIII');
+      this.form.localSaveFilePath = path.join(localSaveFilePath0.replace(/\n/g, ""), 'DarkSoulsIII');
     },
 
-    checkGameFileExists(title, filePath) {
+    checkDirExists(title, filePath) {
       if("" === filePath) {
         // TODO
         // dialog warning when got home_env failed
         // 让玩家指定游戏目录
         filePath = this.onOpenFilePositionButtonClick(title);
         if("" === filePath) {
-          return false;
+          return "";
         }
       }
-
-      return fs.existsSync(filePath);
+      this.ensureDirSync(filePath);
+      return filePath;
+    },
+    ensureDirSync(filePath) {
+      if(!filePath) { return ; }
+      if(!fs.existsSync(filePath)) {
+        fs.mkdirSync(filePath);
+        return ;
+      }
     },
 
     createSavesFile() {
       const savesPath = path.join(process.cwd(), "saves");
-      if(!fs.existsSync(savesPath)) {
-        fs.mkdirSync(savesPath)
-      }
-      this.savesMgrDirPath = savesPath;
+      this.ensureDirSync(savesPath);
+      this.form.savesMgrDirPath = savesPath;
     },
 
     on_click_save() {
-      // if(!this.checkGameFileExists('黑暗之魂3存档', this.localSaveFilePath)) {
-      //   return ;
-      // }
-      if(!this.checkGameFileExists('导出存档', this.savesMgrDirPath)) {
-        this.createSavesFile();
-        if(!this.checkGameFileExists('导出存档', this.savesMgrDirPath)) {
-          return ;
-        }
-      }
-      
-      //TODO 
-      // 从输入框中收集存档信息，比如存档名
-      const savesPath = path.join(this.savesMgrDirPath, "111");
-      if(!this.checkVaildExportSavesDir(savesPath)) {
-        // TODO 
-        // 警告：该存档已存在，请重新取名
-        window.electron.remote.dialog.showMessageBoxSync({
-            message : `存档名存在，请重新取名`,
-            type : "info",
-            buttons : ['确认']
-        })
-        return ;
-      }
+      this.form.localSaveFilePath = this.checkDirExists('黑暗之魂3存档', this.form.localSaveFilePath);
+      if(!this.form.localSaveFilePath) {
+        // TODO
+        // 让玩家选择存档位置
+      } 
+      this.form.savesMgrDirPath = this.checkDirExists('备份存档位置', this.form.savesMgrDirPath);
+      if(!this.form.savesMgrDirPath) {
+        // TODO
+        // 让玩家选择存档位置
+      } 
 
-
+      this.isShowSaveCard = true;
     },
 
 
@@ -138,19 +163,59 @@ export default {
     },
 
     on_click_restore() {
-      if(this.checkGameFileExists()) {
-        return ;
-      }
+      this.form.localSaveFilePath = this.checkDirExists('黑暗之魂3存档', this.form.localSaveFilePath);
+      if(!this.form.localSaveFilePath) {
+        // TODO
+        // 让玩家选择存档位置
+      } 
+      this.form.savesMgrDirPath = this.checkDirExists('备份存档位置', this.form.savesMgrDirPath);
+      if(!this.form.savesMgrDirPath) {
+        // TODO
+        // 让玩家选择存档位置
+      } 
+
 
 
     },
-    checkVaildExportSavesDir(dirName) {
-      if(fs.existsSync(dirName)) {
-        return false;
+    onSaveInfo() {
+      if(!this.form.saveName || !this.form.localSaveFilePath || !this.form.savesMgrDirPath) { return ; }
+
+      const toPath = path.join(this.form.savesMgrDirPath, this.form.saveName);
+      const fromPath = this.form.localSaveFilePath;
+      this.ensureDirSync(fromPath);
+      if(!fs.existsSync(toPath)) {
+        
+        let selection = window.electron.remote.dialog.showMessageBoxSync({
+            message : `存档名存在，是否覆盖存档？`,
+            type : "info",
+            buttons : ['确认', '取消']
+        })
+
+        if(1 === selection) { return ; }
+
+        fs.rmdirSync(toPath);
       }
 
-      fs.mkdirSync(dirName);
-      return true;
+      this.ensureDirSync(toPath);
+      fs.cpSync(fromPath, toPath);
+
+      let nowTime = moment(Date()).format("YYYY-MM-DD HH:MM:SS");
+      console.log("nowTime = ", nowTime);
+      this.tableData.push({
+          date: nowTime,
+          save: this.form.saveName,
+          steam_id: "bhfjdasu3",
+          location: toPath,
+        })
+
+      this.isShowSaveCard = false;
+      this.form.saveName = "";
+    },
+    onClickRestore() {
+
+    },
+    changeSaveDir() {
+      //警告，建议不要改动存档位置，如果改动，不能保证程序能够识别存档位置
     },
   },
 
@@ -164,80 +229,34 @@ export default {
     return {
       tableData: [
         {
-          date: "2016-05-03",
+          date: "2016-05-03 19:00",
           save: "111",
           steam_id: "bhfjdasu3",
           location: "D/abc",
         },
         {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
-          steam_id: "bhfjdasu3",
-          location: "D/abc",
-        },
-        {
-          date: "2016-05-03",
-          save: "111",
+          date: "2016-05-03 19:00",
+          save: "222",
           steam_id: "bhfjdasu3",
           location: "D/abc",
         },
       ],
-      localSaveFilePath: "",
-      savesMgrDirPath: "",
+      isShowSaveCard: false,
+      form: {
+        saveName: "",
+        localSaveFilePath: "",
+        savesMgrDirPath: "",
+      },
+      rules: {
+        saveNameRule: [
+          { required: true, trigger: "blur" },
+          // {
+          //   pattern: /^[a-zA-Z0-9]+$/,
+          //   message: "不允许输入中文",
+          //   trigger: "blur",
+          // },
+        ],
+      },
     };
   },
 };
